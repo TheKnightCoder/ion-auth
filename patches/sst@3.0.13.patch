@@ -1,0 +1,60 @@
+diff --git a/dist/auth/adapter/oidc.js b/dist/auth/adapter/oidc.js
+index 0e6b952a29478a303a5670be51372877d06cf9c0..cb33fcd74e91180798daaa3d051ca5bcf3bd85ed 100644
+--- a/dist/auth/adapter/oidc.js
++++ b/dist/auth/adapter/oidc.js
+@@ -3,7 +3,7 @@ import { getCookie } from "hono/cookie";
+ export const OidcAdapter = /* @__PURE__ */ (config) => {
+     return async function (routes, ctx) {
+         routes.get("/authorize", async (c) => {
+-            const callback = c.req.url.replace(/authorize$/, "callback");
++            const callback = c.req.url.split("?")[0].replace(/authorize$/, "callback");
+             const client = new config.issuer.Client({
+                 client_id: config.clientID,
+                 redirect_uris: [callback],
+@@ -23,7 +23,7 @@ export const OidcAdapter = /* @__PURE__ */ (config) => {
+             return c.redirect(url);
+         });
+         routes.post("/callback", async (c) => {
+-            const callback = c.req.url.replace(/authorize$/, "callback");
++            const callback = c.req.url.split("?")[0].replace(/authorize$/, "callback");
+             const client = new config.issuer.Client({
+                 client_id: config.clientID,
+                 redirect_uris: [callback],
+diff --git a/dist/auth/handler.js b/dist/auth/handler.js
+index cab411f99852ade5c02ed61957246ebe2b2faa99..6429f404df0a8f5a2bc7f83047915b47062e7cc2 100644
+--- a/dist/auth/handler.js
++++ b/dist/auth/handler.js
+@@ -121,7 +121,7 @@ export function AuthHandler(input) {
+             });
+         },
+     };
+-    app.get("/token", async (c) => {
++    app.post("/token", async (c) => {
+         console.log("token request");
+         const form = await c.req.formData();
+         if (form.get("grant_type") !== "authorization_code") {
+@@ -152,6 +152,8 @@ export function AuthHandler(input) {
+         const response_type = c.req.query("response_type") || getCookie(c, "response_type");
+         const redirect_uri = c.req.query("redirect_uri") || getCookie(c, "redirect_uri");
+         const state = c.req.query("state") || getCookie(c, "state");
++        const client_id = c.req.query("client_id") || getCookie(c, "client_id");
++
+         if (!provider) {
+             c.status(400);
+             return c.text("Missing provider");
+@@ -164,10 +166,15 @@ export function AuthHandler(input) {
+             c.status(400);
+             return c.text("Missing response_type");
+         }
++        if (!client_id) {
++            c.status(400);
++            return c.text("Missing client_id");
++        }
+         options.cookie(c, "provider", provider, 60 * 10);
+         options.cookie(c, "response_type", response_type, 60 * 10);
+         options.cookie(c, "redirect_uri", redirect_uri, 60 * 10);
+         options.cookie(c, "state", state || "", 60 * 10);
++        options.cookie(c, "client_id", client_id || "", 60 * 10);
+         if (input.callbacks.auth.start) {
+             await input.callbacks.auth.start(c.req.raw);
+         }
